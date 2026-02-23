@@ -7,6 +7,7 @@ A simple Group Expense Management web application built with **Core PHP** and **
 - **Add members** – Manage trip participants
 - **Add categories** – Add expense categories from the frontend (Train, Dinner, Hotel, Taxi, etc.)
 - **Add expenses** – Record who paid, category, total amount, description, date. Choose **All Members** or **selected members**; amount is divided equally among them and saved in `expense_shares`
+- **Advance Payment** – Credit an amount to selected members (or all). Each selected member gets the full amount credited in settlement (Total Paid + Advance) − Total Share
 - **Dashboard** – All expenses table (Paid By, Category, Total Amount, Description, Date) + **Member-wise Settlement** table (Total Paid, Total Share, Balance)
 - **Delete expense** – Removes expense and its shares (CASCADE)
 - **Responsive design** – Works on mobile and desktop
@@ -38,8 +39,9 @@ asiacamp-php/
 - **categories** – `id`, `name`, `created_at`
 - **expenses** – `id`, `paid_by_member_id`, `category_id`, `total_amount`, `description`, `date`, `created_at`
 - **expense_shares** – `id`, `expense_id`, `member_id`, `share_amount`
+- **advance_payments** – `id`, `member_id`, `amount`, `date`, `description`, `created_at`
 
-Full SQL is in `schema.sql`.
+Full SQL is in `schema.sql`. If you already have the app, run the `CREATE TABLE advance_payments` part from `schema.sql` to add the new feature.
 
 ## Expense logic
 
@@ -52,8 +54,9 @@ Full SQL is in `schema.sql`.
 ## Member-wise Settlement
 
 - **Total Paid** = Sum of `expenses.total_amount` where `paid_by_member_id` = member
+- **Advance** = Sum of `advance_payments.amount` where `member_id` = member (credited to member)
 - **Total Share** = Sum of `expense_shares.share_amount` where `member_id` = member
-- **Balance** = Total Paid − Total Share  
+- **Balance** = (Total Paid + Advance) − Total Share  
   - **Balance > 0** → should **receive** money  
   - **Balance < 0** → should **pay** money  
   - **Balance = 0** → settled

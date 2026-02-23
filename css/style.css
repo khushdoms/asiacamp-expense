@@ -78,6 +78,19 @@ body {
     background: var(--color-primary-hover);
 }
 
+.nav-links a.btn-advance {
+    background: var(--color-success);
+}
+
+.nav-links a.btn-advance:hover {
+    background: #008a20;
+}
+
+.nav-links a.btn-advance.nav-active {
+    background: #008a20;
+    font-weight: 600;
+}
+
 .card {
     background: var(--color-card);
     border-radius: var(--radius);

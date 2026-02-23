@@ -35,6 +35,7 @@ require_once 'includes/header.php';
             <a href="index.php">Dashboard</a>
             <a href="add_member.php">Add Member</a>
             <a href="add_category.php">Add Category</a>
+            <a href="add_advance_payment.php" class="btn btn-advance">Advance Payment</a>
         </nav>
     </header>
 

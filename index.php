@@ -22,11 +22,13 @@ $expenses = $pdo->query("
 $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Member-wise settlement: Total Paid, Total Share, Balance
+// Member-wise settlement: Total Paid (expenses + advance), Total Share, Balance
 $totalPaid = [];
+$totalAdvance = [];
 $totalShare = [];
 foreach ($members as $m) {
     $totalPaid[$m['id']] = 0;
+    $totalAdvance[$m['id']] = 0;
     $totalShare[$m['id']] = 0;
 }
 
@@ -36,6 +38,18 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     if (isset($totalPaid[$mid])) {
         $totalPaid[$mid] += (float) $row['total_amount'];
     }
+}
+
+try {
+    $stmt = $pdo->query("SELECT member_id, amount FROM advance_payments");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $mid = (int) $row['member_id'];
+        if (isset($totalAdvance[$mid])) {
+            $totalAdvance[$mid] += (float) $row['amount'];
+        }
+    }
+} catch (PDOException $e) {
+    // advance_payments table may not exist yet; run schema.sql to add it
 }
 
 $stmt = $pdo->query("SELECT member_id, share_amount FROM expense_shares");
@@ -50,13 +64,17 @@ $settlement = [];
 foreach ($members as $m) {
     $mid = (int) $m['id'];
     $paid = $totalPaid[$mid] ?? 0;
+    $advance = $totalAdvance[$mid] ?? 0;
     $share = $totalShare[$mid] ?? 0;
+    $total = $paid + $advance;
     $settlement[] = [
         'id' => $mid,
         'name' => $m['name'],
         'total_paid' => $paid,
+        'advance' => $advance,
+        'total' => $total,
         'total_share' => $share,
-        'balance' => $paid - $share,
+        'balance' => $total - $share,
     ];
 }
 
@@ -72,6 +90,7 @@ require_once 'includes/header.php';
             <a href="index.php">Dashboard</a>
             <a href="add_member.php">Add Member</a>
             <a href="add_category.php">Add Category</a>
+            <a href="add_advance_payment.php" class="btn btn-advance">Advance Payment</a>
         </nav>
     </header>
 
@@ -198,12 +217,16 @@ require_once 'includes/header.php';
             echo '<p class="message success">Expense deleted. Settlement below has been updated.</p>';
             unset($_SESSION['delete_success']);
         }
+        if (!empty($_SESSION['advance_success'])) {
+            echo '<p class="message success">Advance payment added. Settlement below has been updated.</p>';
+            unset($_SESSION['advance_success']);
+        }
         if (!empty($_SESSION['delete_error'])) {
             echo '<p class="message error">' . htmlspecialchars($_SESSION['delete_error']) . '</p>';
             unset($_SESSION['delete_error']);
         }
         ?>
-        <p class="summary-intro">Balance = Total Paid − Total Share. Positive = should receive; Negative = should pay; Zero = settled.</p>
+        <p class="summary-intro">Balance = (Total Paid + Advance) − Total Share. Advance payments are credited to members. Positive = should receive; Negative = should pay; Zero = settled.</p>
         <?php if (empty($settlement)): ?>
             <p class="no-data">Add members first.</p>
         <?php else: ?>
@@ -213,6 +236,7 @@ require_once 'includes/header.php';
                         <tr>
                             <th>Member Name</th>
                             <th class="amount">Total Paid</th>
+                            <th class="amount">Advance</th>
                             <th class="amount">Total Share</th>
                             <th class="amount">Balance</th>
                         </tr>
@@ -222,6 +246,7 @@ require_once 'includes/header.php';
                             <tr>
                                 <td><?= htmlspecialchars($row['name']) ?></td>
                                 <td class="amount"><?= number_format($row['total_paid'], 2) ?></td>
+                                <td class="amount"><?= number_format($row['advance'], 2) ?></td>
                                 <td class="amount"><?= number_format($row['total_share'], 2) ?></td>
                                 <td class="amount balance <?= $row['balance'] > 0 ? 'positive' : ($row['balance'] < 0 ? 'negative' : 'zero') ?>">
                                     <?= $row['balance'] > 0 ? '+' : '' ?><?= number_format($row['balance'], 2) ?>

@@ -46,5 +46,18 @@ CREATE TABLE IF NOT EXISTS expense_shares (
     INDEX idx_member_id (member_id)
 );
 
+-- Advance payments: credited to member in settlement (Total Paid = expenses + advance)
+CREATE TABLE IF NOT EXISTS advance_payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    member_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    description VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+    INDEX idx_member_id (member_id),
+    INDEX idx_date (date)
+);
+
 -- Optional: Insert sample categories for testing
 -- INSERT INTO categories (name) VALUES ('Train'), ('Dinner'), ('Hotel'), ('Taxi'), ('Other');
