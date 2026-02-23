@@ -1,0 +1,463 @@
+/**
+ * Asia WordCamp 2026 - Group Expense Manager
+ * Simple, clean, responsive CSS
+ */
+
+:root {
+    --color-bg: #f5f6fa;
+    --color-card: #ffffff;
+    --color-primary: #2271b1;
+    --color-primary-hover: #135e96;
+    --color-danger: #b32d2e;
+    --color-danger-hover: #8a2424;
+    --color-success: #00a32a;
+    --color-text: #1d2327;
+    --color-text-muted: #646970;
+    --color-border: #c3c4c7;
+    --color-positive: #00a32a;
+    --color-negative: #b32d2e;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-bg);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--color-border);
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.nav-links {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.nav-links a {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    background: var(--color-primary);
+    color: #fff !important;
+    text-decoration: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+}
+
+.nav-links a:hover {
+    background: var(--color-primary-hover);
+}
+
+.card {
+    background: var(--color-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.card h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Forms */
+.form-section .expense-form,
+.form-section .filter-form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.form-row label {
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.form-row input,
+.form-row select {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.form-row input:focus,
+.form-row select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* Expense For: All / Selected members */
+.form-row.expense-for {
+    align-items: flex-start;
+}
+
+.form-row.expense-for > label {
+    padding-top: 0.25rem;
+}
+
+.expense-for-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.expense-for-options .help {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+.member-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin: 0;
+}
+
+.form-actions {
+    margin-top: 0.5rem;
+}
+
+.form-actions .btn {
+    margin-right: 0.5rem;
+}
+
+/* Filter */
+.filter-section {
+    margin-bottom: 1rem;
+}
+
+.filter-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-form label {
+    font-weight: 500;
+}
+
+.filter-form select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 1rem;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+    background: var(--color-text-muted);
+    color: #fff;
+}
+
+.btn-secondary:hover {
+    background: var(--color-text);
+}
+
+.btn-danger,
+.btn-sm.btn-danger {
+    background: var(--color-danger);
+    color: #fff;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.btn-danger:hover,
+.btn-sm.btn-danger:hover {
+    background: var(--color-danger-hover);
+}
+
+/* Messages */
+.message {
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+}
+
+.message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message.error,
+.error-list {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.error-list {
+    list-style: none;
+    padding: 0.6rem 0.8rem;
+    margin: 0 0 1rem 0;
+    border-radius: var(--radius);
+}
+
+.error-list li {
+    margin: 0.2rem 0;
+}
+
+/* Totals */
+.totals-section .totals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.total-box {
+    padding: 0.8rem;
+    background: var(--color-bg);
+    border-radius: var(--radius);
+}
+
+.total-box .label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.total-box .value {
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.total-box ul {
+    margin: 0.3rem 0 0 0;
+    padding-left: 1.2rem;
+}
+
+.total-box li {
+    margin: 0.2rem 0;
+}
+
+/* Table */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.data-table th {
+    background: var(--color-bg);
+    font-weight: 600;
+}
+
+.data-table .amount {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge-train { background: #e3f2fd; color: #1565c0; }
+.badge-dinner { background: #fff3e0; color: #e65100; }
+.badge-hotel { background: #e8f5e9; color: #2e7d32; }
+.badge-taxi { background: #f3e5f5; color: #7b1fa2; }
+.badge-other { background: #eceff1; color: #455a64; }
+
+.no-data {
+    color: var(--color-text-muted);
+    margin: 0;
+}
+
+/* Summary */
+.summary-section .summary-intro {
+    color: var(--color-text-muted);
+    margin: 0 0 1rem 0;
+    font-size: 0.95rem;
+}
+
+.summary-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.summary-total-box {
+    padding: 0.8rem 1.2rem;
+    background: var(--color-bg);
+    border-radius: var(--radius);
+}
+
+.summary-total-box .label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.summary-total-box .value {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.summary-table .balance.positive {
+    color: var(--color-positive);
+}
+
+.summary-table .balance.negative {
+    color: var(--color-negative);
+}
+
+.summary-table .balance.zero {
+    color: var(--color-text-muted);
+}
+
+.balance-desc {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-left: 0.3rem;
+}
+
+/* Footer */
+.page-footer {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+.page-footer p {
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .container {
+        padding: 0.75rem;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row label {
+        margin-bottom: 0;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.5rem 0.4rem;
+        font-size: 0.85rem;
+    }
+
+    .data-table thead tr th:nth-child(4),
+    .data-table tbody tr td:nth-child(4) {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .totals-section .totals-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nav-links a {
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .data-table th:nth-child(3),
+    .data-table td:nth-child(3) {
+        display: none;
+    }
+}
