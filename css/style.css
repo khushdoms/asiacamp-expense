@@ -143,6 +143,12 @@ body {
     text-overflow: ellipsis;
 }
 
+.settlement-transposed .total-row td {
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.05);
+    border-top: 2px solid var(--color-border);
+}
+
 .card {
     background: var(--color-card);
     border-radius: var(--radius);

@@ -3,10 +3,11 @@
  * Database configuration - PDO connection for Asia WordCamp 2026 Expense Manager
  */
 
- define('DB_HOST', 'localhost');
- define('DB_NAME', 'asiacamp_expenses');
- define('DB_USER', 'expense_user');
- define('DB_PASS', 'StrongPassword123');
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'asiacamp_expenses');
+define('DB_USER', 'root');
+define('DB_PASS', '');  // Change if your MySQL has a password
+define('DB_CHARSET', 'utf8mb4');
 
 try {
     $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;

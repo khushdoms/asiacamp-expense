@@ -271,39 +271,40 @@ require_once 'includes/header.php';
             unset($_SESSION['expense_form']);
         }
         ?>
-        <p class="summary-intro">Per-person expense by category. Last column = total expense for that member.</p>
+        <p class="summary-intro">Per-person expense by category (transposed: expenses as rows, members as columns). Last row = total expense per member.</p>
         <?php if (empty($members)): ?>
             <p class="no-data">Add members first.</p>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="data-table summary-table settlement-grid">
+                <table class="data-table summary-table settlement-grid settlement-transposed">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <?php foreach ($expenseColumns as $col): ?>
-                                <th class="amount" title="<?= $col['header'] ?>"><?= $col['header'] ?></th>
+                            <th>Expense</th>
+                            <?php foreach ($members as $m): ?>
+                                <th class="amount"><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' <span class="badge-admin">Admin</span>' : '' ?></th>
                             <?php endforeach; ?>
-                            <th class="amount total-col">Total Expense</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($members as $m): ?>
-                            <?php
-                            $mid = (int) $m['id'];
-                            $rowTotal = 0;
-                            ?>
+                        <?php foreach ($expenseColumns as $col): ?>
                             <tr>
-                                <td><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' <span class="badge-admin">Admin</span>' : '' ?></td>
-                                <?php foreach ($expenseColumns as $col): ?>
-                                    <?php
-                                    $amt = $memberShares[$mid][$col['id']] ?? 0;
-                                    $rowTotal += $amt;
-                                    ?>
+                                <td><?= $col['header'] ?></td>
+                                <?php foreach ($members as $m): ?>
+                                    <?php $amt = $memberShares[(int) $m['id']][$col['id']] ?? 0; ?>
                                     <td class="amount"><?= number_format($amt, 2) ?></td>
                                 <?php endforeach; ?>
-                                <td class="amount total-col"><?= number_format($rowTotal, 2) ?></td>
                             </tr>
                         <?php endforeach; ?>
+                        <tr class="total-row">
+                            <td class="total-col">Total Expense</td>
+                            <?php foreach ($members as $m): ?>
+                                <?php
+                                $mid = (int) $m['id'];
+                                $rowTotal = array_sum($memberShares[$mid] ?? []);
+                                ?>
+                                <td class="amount total-col"><?= number_format($rowTotal, 2) ?></td>
+                            <?php endforeach; ?>
+                        </tr>
                     </tbody>
                 </table>
             </div>
