@@ -1,28 +1,35 @@
 <?php
 /**
  * Asia WordCamp 2026 - Group Expense Management
- * Dashboard: Add expense form, All expenses table, Member-wise settlement table
+ * Dashboard: Add expense form, All expenses table, Member-wise settlement, Admin summary
  */
 
 require_once 'config.php';
 
 session_start();
 
-// Fetch all expenses with paid-by name and category name
+$admin = $pdo->query("SELECT id, name FROM members WHERE is_admin = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+
+// Fetch all expenses with paid-by name, category name, share count
 $expenses = $pdo->query("
     SELECT e.id, e.paid_by_member_id, e.category_id, e.total_amount, e.description, e.date,
-           m.name AS paid_by_name, c.name AS category_name
+           m.name AS paid_by_name, c.name AS category_name,
+           (SELECT COUNT(*) FROM expense_shares es WHERE es.expense_id = e.id) AS share_count
     FROM expenses e
     JOIN members m ON e.paid_by_member_id = m.id
     JOIN categories c ON e.category_id = c.id
     ORDER BY e.date DESC, e.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Members and categories for dropdowns
-$members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+foreach ($expenses as &$e) {
+    $e['share_count'] = (int) $e['share_count'];
+    $e['per_person'] = $e['share_count'] > 0 ? round((float) $e['total_amount'] / $e['share_count'], 2) : 0;
+}
+unset($e);
+
+$members = $pdo->query("SELECT id, name, is_admin FROM members ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Member-wise settlement: Total Paid (expenses + advance), Total Share, Balance
 $totalPaid = [];
 $totalAdvance = [];
 $totalShare = [];
@@ -48,9 +55,7 @@ try {
             $totalAdvance[$mid] += (float) $row['amount'];
         }
     }
-} catch (PDOException $e) {
-    // advance_payments table may not exist yet; run schema.sql to add it
-}
+} catch (PDOException $e) {}
 
 $stmt = $pdo->query("SELECT member_id, share_amount FROM expense_shares");
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -60,25 +65,34 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     }
 }
 
-$settlement = [];
+// Build expense columns for Member-wise Settlement (category + description)
+$expenseColumns = [];
+$memberShares = [];
 foreach ($members as $m) {
-    $mid = (int) $m['id'];
-    $paid = $totalPaid[$mid] ?? 0;
-    $advance = $totalAdvance[$mid] ?? 0;
-    $share = $totalShare[$mid] ?? 0;
-    $total = $paid + $advance;
-    $settlement[] = [
-        'id' => $mid,
-        'name' => $m['name'],
-        'total_paid' => $paid,
-        'advance' => $advance,
-        'total' => $total,
-        'total_share' => $share,
-        'balance' => $total - $share,
-    ];
+    $memberShares[(int) $m['id']] = [];
+}
+$expensesForSettlement = $pdo->query("
+    SELECT e.id, c.name AS category_name, e.description
+    FROM expenses e
+    JOIN categories c ON e.category_id = c.id
+    ORDER BY e.date ASC, e.id ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+foreach ($expensesForSettlement as $ex) {
+    $eid = (int) $ex['id'];
+    $header = htmlspecialchars($ex['category_name']) . '(' . htmlspecialchars($ex['description']) . ')';
+    $expenseColumns[] = ['id' => $eid, 'header' => $header];
+}
+$sharesData = $pdo->query("SELECT expense_id, member_id, share_amount FROM expense_shares")->fetchAll(PDO::FETCH_ASSOC);
+foreach ($sharesData as $s) {
+    $eid = (int) $s['expense_id'];
+    $mid = (int) $s['member_id'];
+    if (isset($memberShares[$mid])) {
+        $memberShares[$mid][$eid] = (float) $s['share_amount'];
+    }
 }
 
 $formData = $_SESSION['expense_form'] ?? null;
+$showExpenseForm = !empty($_SESSION['expense_errors']);
 $pageTitle = 'Asia WordCamp 2026 - Expense Dashboard';
 require_once 'includes/header.php';
 ?>
@@ -91,32 +105,31 @@ require_once 'includes/header.php';
             <a href="add_member.php">Add Member</a>
             <a href="add_category.php">Add Category</a>
             <a href="add_advance_payment.php" class="btn btn-advance">Advance Payment</a>
+            <form action="clear_db.php" method="POST" class="nav-clear-form" onsubmit="return confirm('Clear ALL data? This cannot be undone.');">
+                <button type="submit" class="btn btn-danger">Clear Database</button>
+            </form>
         </nav>
     </header>
 
-    <!-- Add New Expense Form -->
+    <!-- Add New Expense -->
     <section class="card form-section">
         <h2>Add New Expense</h2>
-        <?php
-        if (isset($_SESSION['expense_errors'])) {
-            echo '<ul class="message error-list">';
-            foreach ($_SESSION['expense_errors'] as $err) {
-                echo '<li>' . htmlspecialchars($err) . '</li>';
-            }
-            echo '</ul>';
-            unset($_SESSION['expense_errors']);
-        }
-        if (isset($_SESSION['expense_form'])) {
-            unset($_SESSION['expense_form']);
-        }
-        ?>
-        <form action="add_expense.php" method="POST" class="expense-form">
+        <?php if (isset($_SESSION['expense_errors'])): ?>
+            <ul class="message error-list">
+                <?php foreach ($_SESSION['expense_errors'] as $err): ?>
+                    <li><?= htmlspecialchars($err) ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <?php unset($_SESSION['expense_errors']); ?>
+        <?php endif; ?>
+        <button type="button" class="btn btn-primary" id="toggleExpenseForm">Add Expense</button>
+        <form action="add_expense.php" method="POST" class="expense-form" id="expenseForm" style="<?= $showExpenseForm ? '' : 'display:none;' ?>">
             <div class="form-row">
                 <label for="paid_by_member_id">Paid By *</label>
                 <select name="paid_by_member_id" id="paid_by_member_id" required>
                     <option value="">-- Select Member --</option>
                     <?php foreach ($members as $m): ?>
-                        <option value="<?= (int) $m['id'] ?>"<?= ($formData['paid_by_member_id'] ?? '') == $m['id'] ? ' selected' : '' ?>><?= htmlspecialchars($m['name']) ?></option>
+                        <option value="<?= (int) $m['id'] ?>"<?= (($formData['paid_by_member_id'] ?? $admin['id'] ?? '') == $m['id']) ? ' selected' : '' ?>><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' (Admin)' : '' ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -135,13 +148,12 @@ require_once 'includes/header.php';
             </div>
             <div class="form-row">
                 <label for="description">Description *</label>
-                <input type="text" name="description" id="description" required placeholder="e.g. Chirag paid for taxi for all" value="<?= htmlspecialchars($formData['description'] ?? '') ?>">
+                <input type="text" name="description" id="description" required placeholder="e.g. Kaushik booked train for 5 people" value="<?= htmlspecialchars($formData['description'] ?? '') ?>">
             </div>
             <div class="form-row">
                 <label for="date">Date *</label>
                 <input type="date" name="date" id="date" value="<?= htmlspecialchars($formData['date'] ?? date('Y-m-d')) ?>" required>
             </div>
-
             <div class="form-row expense-for">
                 <label>Expense For *</label>
                 <div class="expense-for-options">
@@ -160,17 +172,35 @@ require_once 'includes/header.php';
                             <label class="checkbox-label">
                                 <input type="checkbox" name="member_ids[]" value="<?= $mid ?>" class="member-check"<?= $checked ?>>
                                 <?= htmlspecialchars($m['name']) ?>
-                            </label>    
+                            </label>
                         <?php endforeach; ?>
                     </div>
                 </div>
             </div>
-
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add Expense</button>
+                <button type="button" class="btn btn-secondary" id="cancelExpenseForm">Cancel</button>
             </div>
         </form>
     </section>
+
+    <?php if ($admin): ?>
+    <!-- Admin Credit / Debit Summary -->
+    <section class="card table-section">
+        <h2>Admin (<?= htmlspecialchars($admin['name']) ?>) – Credit & Debit</h2>
+        <?php
+        $adminId = (int) $admin['id'];
+        $adminDebit = $totalPaid[$adminId] ?? 0;
+        $adminCredit = $totalAdvance[$adminId] ?? 0;
+        $adminShare = $totalShare[$adminId] ?? 0;
+        $adminBalance = ($adminDebit + $adminCredit) - $adminShare;
+        ?>
+        <div class="admin-summary">
+            <div class="admin-row"><span class="label">Credit (Advance received):</span> <span class="amount positive"><?= number_format($adminCredit, 2) ?></span></div>
+            <div class="admin-row"><span class="label">Balance:</span> <span class="amount balance <?= $adminBalance >= 0 ? 'positive' : 'negative' ?>"><?= $adminBalance >= 0 ? '+' : '' ?><?= number_format($adminBalance, 2) ?></span></div>
+        </div>
+    </section>
+    <?php endif; ?>
 
     <!-- All Expenses Table -->
     <section class="card table-section">
@@ -185,6 +215,8 @@ require_once 'includes/header.php';
                             <th>Paid By</th>
                             <th>Category</th>
                             <th class="amount">Total Amount</th>
+                            <th class="amount">Per Person</th>
+                            <th>People</th>
                             <th>Description</th>
                             <th>Date</th>
                             <th>Action</th>
@@ -196,6 +228,8 @@ require_once 'includes/header.php';
                                 <td><?= htmlspecialchars($e['paid_by_name']) ?></td>
                                 <td><?= htmlspecialchars($e['category_name']) ?></td>
                                 <td class="amount"><?= number_format((float) $e['total_amount'], 2) ?></td>
+                                <td class="amount"><?= number_format($e['per_person'], 2) ?></td>
+                                <td><?= $e['share_count'] ?></td>
                                 <td><?= htmlspecialchars($e['description']) ?></td>
                                 <td><?= htmlspecialchars($e['date']) ?></td>
                                 <td>
@@ -225,33 +259,49 @@ require_once 'includes/header.php';
             echo '<p class="message error">' . htmlspecialchars($_SESSION['delete_error']) . '</p>';
             unset($_SESSION['delete_error']);
         }
+        if (!empty($_SESSION['clear_success'])) {
+            echo '<p class="message success">All data cleared.</p>';
+            unset($_SESSION['clear_success']);
+        }
+        if (!empty($_SESSION['clear_error'])) {
+            echo '<p class="message error">' . htmlspecialchars($_SESSION['clear_error']) . '</p>';
+            unset($_SESSION['clear_error']);
+        }
+        if (isset($_SESSION['expense_form'])) {
+            unset($_SESSION['expense_form']);
+        }
         ?>
-        <p class="summary-intro">Balance = (Total Paid + Advance) − Total Share. Advance payments are credited to members. Positive = should receive; Negative = should pay; Zero = settled.</p>
-        <?php if (empty($settlement)): ?>
+        <p class="summary-intro">Per-person expense by category. Last column = total expense for that member.</p>
+        <?php if (empty($members)): ?>
             <p class="no-data">Add members first.</p>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="data-table summary-table">
+                <table class="data-table summary-table settlement-grid">
                     <thead>
                         <tr>
-                            <th>Member Name</th>
-                            <th class="amount">Total Paid</th>
-                            <th class="amount">Advance</th>
-                            <th class="amount">Total Share</th>
-                            <th class="amount">Balance</th>
+                            <th>Name</th>
+                            <?php foreach ($expenseColumns as $col): ?>
+                                <th class="amount" title="<?= $col['header'] ?>"><?= $col['header'] ?></th>
+                            <?php endforeach; ?>
+                            <th class="amount total-col">Total Expense</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($settlement as $row): ?>
+                        <?php foreach ($members as $m): ?>
+                            <?php
+                            $mid = (int) $m['id'];
+                            $rowTotal = 0;
+                            ?>
                             <tr>
-                                <td><?= htmlspecialchars($row['name']) ?></td>
-                                <td class="amount"><?= number_format($row['total_paid'], 2) ?></td>
-                                <td class="amount"><?= number_format($row['advance'], 2) ?></td>
-                                <td class="amount"><?= number_format($row['total_share'], 2) ?></td>
-                                <td class="amount balance <?= $row['balance'] > 0 ? 'positive' : ($row['balance'] < 0 ? 'negative' : 'zero') ?>">
-                                    <?= $row['balance'] > 0 ? '+' : '' ?><?= number_format($row['balance'], 2) ?>
-                                    <span class="balance-desc"><?= $row['balance'] > 0 ? '(receive)' : ($row['balance'] < 0 ? '(pay)' : '(settled)') ?></span>
-                                </td>
+                                <td><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' <span class="badge-admin">Admin</span>' : '' ?></td>
+                                <?php foreach ($expenseColumns as $col): ?>
+                                    <?php
+                                    $amt = $memberShares[$mid][$col['id']] ?? 0;
+                                    $rowTotal += $amt;
+                                    ?>
+                                    <td class="amount"><?= number_format($amt, 2) ?></td>
+                                <?php endforeach; ?>
+                                <td class="amount total-col"><?= number_format($rowTotal, 2) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -262,17 +312,24 @@ require_once 'includes/header.php';
 </div>
 
 <script>
-document.getElementById('expense_for_all').addEventListener('change', function() {
-    var checks = document.querySelectorAll('.member-check');
-    checks.forEach(function(c) { c.disabled = this.checked; }.bind(this));
+document.getElementById('toggleExpenseForm').addEventListener('click', function() {
+    var form = document.getElementById('expenseForm');
+    form.style.display = form.style.display === 'none' ? 'grid' : 'none';
 });
-// Initialize on load
-(function() {
-    var all = document.getElementById('expense_for_all');
-    if (all && all.checked) {
+var cancelBtn = document.getElementById('cancelExpenseForm');
+if (cancelBtn) cancelBtn.addEventListener('click', function() {
+    document.getElementById('expenseForm').style.display = 'none';
+});
+var expenseForAll = document.getElementById('expense_for_all');
+if (expenseForAll) {
+    expenseForAll.addEventListener('change', function() {
+        var checks = document.querySelectorAll('.member-check');
+        checks.forEach(function(c) { c.disabled = this.checked; }.bind(this));
+    });
+    if (expenseForAll.checked) {
         document.querySelectorAll('.member-check').forEach(function(c) { c.disabled = true; });
     }
-})();
+}
 </script>
 
 <?php require_once 'includes/footer.php'; ?>

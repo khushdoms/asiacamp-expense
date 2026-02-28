@@ -10,12 +10,13 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
+    $isAdmin = isset($_POST['is_admin']) ? 1 : 0;
     if ($name === '') {
         $error = 'Please enter a member name.';
     } else {
         try {
-            $stmt = $pdo->prepare("INSERT INTO members (name) VALUES (?)");
-            $stmt->execute([$name]);
+            $stmt = $pdo->prepare("INSERT INTO members (name, is_admin) VALUES (?, ?)");
+            $stmt->execute([$name, $isAdmin]);
             $message = 'Member "' . htmlspecialchars($name) . '" added successfully.';
             $name = ''; // clear for next add
         } catch (PDOException $e) {
@@ -51,6 +52,13 @@ require_once 'includes/header.php';
             <div class="form-row">
                 <label for="name">Member Name *</label>
                 <input type="text" name="name" id="name" required placeholder="e.g. Kaushik" value="<?= htmlspecialchars($name ?? '') ?>">
+            </div>
+            <div class="form-row">
+                <label></label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_admin" id="is_admin" value="1"<?= !empty($_POST['is_admin']) ? ' checked' : '' ?>>
+                    Is Admin
+                </label>
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add Member</button>

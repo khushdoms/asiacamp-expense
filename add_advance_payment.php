@@ -1,6 +1,6 @@
 <?php
 /**
- * Add advance payment: amount credited to selected members in settlement
+ * Add advance payment: all members give same amount, credited to admin
  */
 
 require_once 'config.php';
@@ -14,9 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $amount = (float) ($_POST['amount'] ?? 0);
     $date = trim($_POST['date'] ?? date('Y-m-d'));
     $description = trim($_POST['description'] ?? '');
-    $applyToAll = isset($_POST['apply_to_all']);
-    $memberIds = isset($_POST['member_ids']) && is_array($_POST['member_ids'])
-        ? array_map('intval', array_filter($_POST['member_ids'])) : [];
 
     $errors = [];
     if ($amount <= 0) {
@@ -26,12 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $date = date('Y-m-d');
     }
 
-    if ($applyToAll) {
-        $stmt = $pdo->query("SELECT id FROM members ORDER BY name");
-        $memberIds = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+    $admin = $pdo->query("SELECT id FROM members WHERE is_admin = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if (!$admin) {
+        $errors[] = 'No admin member found. Add a member and mark as Admin first.';
     }
-    if (empty($memberIds)) {
-        $errors[] = 'Please select "All Members" or at least one member.';
+
+    $members = $pdo->query("SELECT id FROM members ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    if (empty($members)) {
+        $errors[] = 'No members found. Add members first.';
     }
 
     if (!empty($errors)) {
@@ -40,13 +39,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $pdo->beginTransaction();
+            $adminId = (int) $admin['id'];
+            $memberCount = count($members);
+            $totalAmount = $amount * $memberCount;
+
             $stmt = $pdo->prepare("INSERT INTO advance_payments (member_id, amount, date, description) VALUES (?, ?, ?, ?)");
-            foreach ($memberIds as $mid) {
-                $stmt->execute([$mid, $amount, $date, $description ?: null]);
+            $stmt->execute([$adminId, $totalAmount, $date, $description ?: null]);
+            foreach ($members as $m) {
+                $mid = (int) $m['id'];
+                if ($mid !== $adminId) {
+                    $stmt->execute([$mid, $amount, $date, $description ?: null]);
+                }
             }
             $pdo->commit();
-            $count = count($memberIds);
-            $message = "Advance payment of " . number_format($amount, 2) . " credited to {$count} member(s). Settlement updated.";
             $_SESSION['advance_success'] = true;
             header('Location: index.php#settlement');
             exit;
@@ -58,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $formData = $_SESSION['advance_form'] ?? null;
 if (isset($_SESSION['advance_form'])) {
     unset($_SESSION['advance_form']);
@@ -81,17 +85,15 @@ require_once 'includes/header.php';
 
     <section class="card form-section">
         <h2>Add Advance Payment</h2>
-        <p class="help">Advance payment is credited to each selected member in Member-wise Settlement (increases Total Paid).</p>
-        <?php if ($message): ?>
-            <p class="message success"><?= $message ?></p>
-        <?php endif; ?>
+        <p class="help">Each member gives the same amount. Total is credited to admin. All members get the amount credited to reduce their share.</p>
         <?php if ($error): ?>
             <p class="message error"><?= htmlspecialchars($error) ?></p>
         <?php endif; ?>
-        <form action="add_advance_payment.php" method="POST" class="expense-form">
+        <button type="button" class="btn btn-primary" id="toggleAdvanceForm">Add Advance Payment</button>
+        <form action="add_advance_payment.php" method="POST" class="expense-form" id="advanceForm" style="<?= $error ? '' : 'display:none;' ?>">
             <div class="form-row">
-                <label for="amount">Amount *</label>
-                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="e.g. 2000" value="<?= htmlspecialchars($formData['amount'] ?? '') ?>">
+                <label for="amount">Amount per member *</label>
+                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="e.g. 500" value="<?= htmlspecialchars($formData['amount'] ?? '') ?>">
             </div>
             <div class="form-row">
                 <label for="date">Date *</label>
@@ -101,48 +103,22 @@ require_once 'includes/header.php';
                 <label for="description">Description</label>
                 <input type="text" name="description" id="description" placeholder="e.g. Prepaid for hotel" value="<?= htmlspecialchars($formData['description'] ?? '') ?>">
             </div>
-            <div class="form-row expense-for">
-                <label>Apply To *</label>
-                <div class="expense-for-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="apply_to_all" id="apply_to_all" value="1"<?= !empty($formData['apply_to_all']) ? ' checked' : '' ?>>
-                        All Members
-                    </label>
-                    <p class="help">Or select specific members below (deselect "All Members" first):</p>
-                    <div class="member-checkboxes">
-                        <?php
-                        $checkedIds = isset($formData['member_ids']) && is_array($formData['member_ids']) ? array_map('intval', $formData['member_ids']) : [];
-                        foreach ($members as $m):
-                            $mid = (int) $m['id'];
-                            $checked = in_array($mid, $checkedIds, true) ? ' checked' : '';
-                        ?>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="member_ids[]" value="<?= $mid ?>" class="advance-member-check"<?= $checked ?>>
-                                <?= htmlspecialchars($m['name']) ?>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add Advance Payment</button>
-                <a href="index.php" class="btn btn-secondary">Back to Dashboard</a>
+                <button type="button" class="btn btn-secondary" id="cancelAdvanceForm">Cancel</button>
             </div>
         </form>
     </section>
 </div>
 
 <script>
-document.getElementById('apply_to_all').addEventListener('change', function() {
-    var checks = document.querySelectorAll('.advance-member-check');
-    checks.forEach(function(c) { c.disabled = this.checked; }.bind(this));
+document.getElementById('toggleAdvanceForm').addEventListener('click', function() {
+    var form = document.getElementById('advanceForm');
+    form.style.display = form.style.display === 'none' ? 'grid' : 'none';
 });
-(function() {
-    var all = document.getElementById('apply_to_all');
-    if (all && all.checked) {
-        document.querySelectorAll('.advance-member-check').forEach(function(c) { c.disabled = true; });
-    }
-})();
+document.getElementById('cancelAdvanceForm').addEventListener('click', function() {
+    document.getElementById('advanceForm').style.display = 'none';
+});
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
