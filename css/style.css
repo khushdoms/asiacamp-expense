@@ -250,6 +250,20 @@ body {
     margin-bottom: 1rem;
 }
 
+tr.total-row {
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+span.badge-admin {
+    font-size: 0.75rem;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    margin-left: 0.3rem;
+}
+
 .filter-form {
     display: flex;
     align-items: center;
