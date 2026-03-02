@@ -5,12 +5,14 @@
 
 require_once 'config.php';
 
+ensure_session_started();
+
 $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
-    $isAdmin = isset($_POST['is_admin']) ? 1 : 0;
+    $isAdmin = (!empty($_SESSION['is_admin']) && isset($_POST['is_admin'])) ? 1 : 0;
     if ($name === '') {
         $error = 'Please enter a member name.';
     } else {
@@ -53,13 +55,15 @@ require_once 'includes/header.php';
                 <label for="name">Member Name *</label>
                 <input type="text" name="name" id="name" required placeholder="e.g. Kaushik" value="<?= htmlspecialchars($name ?? '') ?>">
             </div>
-            <div class="form-row">
-                <label></label>
-                <label class="checkbox-label">
-                    <input type="checkbox" name="is_admin" id="is_admin" value="1"<?= !empty($_POST['is_admin']) ? ' checked' : '' ?>>
-                    Is Admin
-                </label>
-            </div>
+            <?php if (!empty($_SESSION['is_admin'])): ?>
+                <div class="form-row">
+                    <label></label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="is_admin" id="is_admin" value="1"<?= !empty($_POST['is_admin']) ? ' checked' : '' ?>>
+                        Is Admin
+                    </label>
+                </div>
+            <?php endif; ?>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add Member</button>
                 <a href="index.php" class="btn btn-secondary">Back to Dashboard</a>

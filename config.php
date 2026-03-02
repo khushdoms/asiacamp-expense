@@ -6,8 +6,27 @@
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'asiacamp_expenses');
 define('DB_USER', 'root');
-define('DB_PASS', '');  // Change if your MySQL has a password
+define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
+
+// Simple shared admin password (change this!)
+define('ADMIN_PASSWORD', 'admin2026');
+
+function ensure_session_started(): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+}
+
+function require_admin(): void
+{
+    ensure_session_started();
+    if (empty($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
+        header('Location: admin_login.php');
+        exit;
+    }
+}
 
 try {
     $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
@@ -18,13 +37,14 @@ try {
     ];
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
 
-    // Ensure advance_payments table exists (for existing installs)
     // Ensure members has is_admin column (for existing installs)
     try {
         $pdo->exec("ALTER TABLE members ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0");
     } catch (PDOException $e) {
         // Column may already exist
     }
+
+    // Ensure advance_payments table exists (for existing installs)
     $pdo->exec("CREATE TABLE IF NOT EXISTS advance_payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         member_id INT NOT NULL,

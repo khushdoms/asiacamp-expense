@@ -6,7 +6,9 @@
 
 require_once 'config.php';
 
-session_start();
+require_admin();
+
+ensure_session_started();
 
 $id = (int) ($_GET['id'] ?? 0);
 if ($id > 0) {

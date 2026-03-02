@@ -5,7 +5,9 @@
 
 require_once 'config.php';
 
-session_start();
+require_admin();
+
+ensure_session_started();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {

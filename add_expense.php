@@ -6,12 +6,14 @@
 
 require_once 'config.php';
 
+require_admin();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: index.php');
     exit;
 }
 
-session_start();
+ensure_session_started();
 
 $paidByMemberId = (int) ($_POST['paid_by_member_id'] ?? 0);
 $categoryId = (int) ($_POST['category_id'] ?? 0);

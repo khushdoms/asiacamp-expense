@@ -102,12 +102,17 @@ require_once 'includes/header.php';
         <h1>Asia WordCamp 2026 – Group Expenses</h1>
         <nav class="nav-links">
             <a href="index.php">Dashboard</a>
-            <a href="add_member.php">Add Member</a>
-            <a href="add_category.php">Add Category</a>
-            <a href="add_advance_payment.php" class="btn btn-advance">Advance Payment</a>
-            <form action="clear_db.php" method="POST" class="nav-clear-form" onsubmit="return confirm('Clear ALL data? This cannot be undone.');">
-                <button type="submit" class="btn btn-danger">Clear Database</button>
-            </form>
+            <?php if (!empty($_SESSION['is_admin'])): ?>
+                <a href="add_member.php">Add Member</a>
+                <a href="add_category.php">Add Category</a>
+                <a href="add_advance_payment.php" class="btn btn-advance">Advance Payment</a>
+                <a href="manage_admins.php">Manage Admins</a>
+                <form action="clear_db.php" method="POST" class="nav-clear-form" onsubmit="return confirm('Clear ALL data? This cannot be undone.');">
+                    <button type="submit" class="btn btn-danger">Clear Database</button>
+                </form>
+            <?php else: ?>
+                <a href="admin_login.php">Admin Login</a>
+            <?php endif; ?>
         </nav>
     </header>
 
@@ -122,66 +127,70 @@ require_once 'includes/header.php';
             </ul>
             <?php unset($_SESSION['expense_errors']); ?>
         <?php endif; ?>
-        <button type="button" class="btn btn-primary" id="toggleExpenseForm">Add Expense</button>
-        <form action="add_expense.php" method="POST" class="expense-form" id="expenseForm" style="<?= $showExpenseForm ? '' : 'display:none;' ?>">
-            <div class="form-row">
-                <label for="paid_by_member_id">Paid By *</label>
-                <select name="paid_by_member_id" id="paid_by_member_id" required>
-                    <option value="">-- Select Member --</option>
-                    <?php foreach ($members as $m): ?>
-                        <option value="<?= (int) $m['id'] ?>"<?= (($formData['paid_by_member_id'] ?? $admin['id'] ?? '') == $m['id']) ? ' selected' : '' ?>><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' (Admin)' : '' ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-row">
-                <label for="category_id">Category *</label>
-                <select name="category_id" id="category_id" required>
-                    <option value="">-- Select Category --</option>
-                    <?php foreach ($categories as $c): ?>
-                        <option value="<?= (int) $c['id'] ?>"<?= ($formData['category_id'] ?? '') == $c['id'] ? ' selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-row">
-                <label for="total_amount">Total Amount *</label>
-                <input type="number" name="total_amount" id="total_amount" step="0.01" min="0.01" required placeholder="0.00" value="<?= htmlspecialchars($formData['total_amount'] ?? '') ?>">
-            </div>
-            <div class="form-row">
-                <label for="description">Description *</label>
-                <input type="text" name="description" id="description" required placeholder="e.g. Kaushik booked train for 5 people" value="<?= htmlspecialchars($formData['description'] ?? '') ?>">
-            </div>
-            <div class="form-row">
-                <label for="date">Date *</label>
-                <input type="date" name="date" id="date" value="<?= htmlspecialchars($formData['date'] ?? date('Y-m-d')) ?>" required>
-            </div>
-            <div class="form-row expense-for">
-                <label>Expense For *</label>
-                <div class="expense-for-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="expense_for_all" id="expense_for_all" value="1"<?= !empty($formData['expense_for_all']) ? ' checked' : '' ?>>
-                        All Members
-                    </label>
-                    <p class="help">Or select specific members below (deselect "All Members" first):</p>
-                    <div class="member-checkboxes">
-                        <?php
-                        $checkedIds = isset($formData['member_ids']) && is_array($formData['member_ids']) ? array_map('intval', $formData['member_ids']) : [];
-                        foreach ($members as $m):
-                            $mid = (int) $m['id'];
-                            $checked = in_array($mid, $checkedIds, true) ? ' checked' : '';
-                        ?>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="member_ids[]" value="<?= $mid ?>" class="member-check"<?= $checked ?>>
-                                <?= htmlspecialchars($m['name']) ?>
-                            </label>
+        <?php if (!empty($_SESSION['is_admin'])): ?>
+            <button type="button" class="btn btn-primary" id="toggleExpenseForm">Add Expense</button>
+            <form action="add_expense.php" method="POST" class="expense-form" id="expenseForm" style="<?= $showExpenseForm ? '' : 'display:none;' ?>">
+                <div class="form-row">
+                    <label for="paid_by_member_id">Paid By *</label>
+                    <select name="paid_by_member_id" id="paid_by_member_id" required>
+                        <option value="">-- Select Member --</option>
+                        <?php foreach ($members as $m): ?>
+                            <option value="<?= (int) $m['id'] ?>"<?= (($formData['paid_by_member_id'] ?? $admin['id'] ?? '') == $m['id']) ? ' selected' : '' ?>><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' (Admin)' : '' ?></option>
                         <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="category_id">Category *</label>
+                    <select name="category_id" id="category_id" required>
+                        <option value="">-- Select Category --</option>
+                        <?php foreach ($categories as $c): ?>
+                            <option value="<?= (int) $c['id'] ?>"<?= ($formData['category_id'] ?? '') == $c['id'] ? ' selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="total_amount">Total Amount *</label>
+                    <input type="number" name="total_amount" id="total_amount" step="0.01" min="0.01" required placeholder="0.00" value="<?= htmlspecialchars($formData['total_amount'] ?? '') ?>">
+                </div>
+                <div class="form-row">
+                    <label for="description">Description *</label>
+                    <input type="text" name="description" id="description" required placeholder="e.g. Kaushik booked train for 5 people" value="<?= htmlspecialchars($formData['description'] ?? '') ?>">
+                </div>
+                <div class="form-row">
+                    <label for="date">Date *</label>
+                    <input type="date" name="date" id="date" value="<?= htmlspecialchars($formData['date'] ?? date('Y-m-d')) ?>" required>
+                </div>
+                <div class="form-row expense-for">
+                    <label>Expense For *</label>
+                    <div class="expense-for-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="expense_for_all" id="expense_for_all" value="1"<?= !empty($formData['expense_for_all']) ? ' checked' : '' ?>>
+                            All Members
+                        </label>
+                        <p class="help">Or select specific members below (deselect "All Members" first):</p>
+                        <div class="member-checkboxes">
+                            <?php
+                            $checkedIds = isset($formData['member_ids']) && is_array($formData['member_ids']) ? array_map('intval', $formData['member_ids']) : [];
+                            foreach ($members as $m):
+                                $mid = (int) $m['id'];
+                                $checked = in_array($mid, $checkedIds, true) ? ' checked' : '';
+                            ?>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="member_ids[]" value="<?= $mid ?>" class="member-check"<?= $checked ?>>
+                                    <?= htmlspecialchars($m['name']) ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Add Expense</button>
-                <button type="button" class="btn btn-secondary" id="cancelExpenseForm">Cancel</button>
-            </div>
-        </form>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Expense</button>
+                    <button type="button" class="btn btn-secondary" id="cancelExpenseForm">Cancel</button>
+                </div>
+            </form>
+        <?php else: ?>
+            <p class="message error">Only admin can add expenses. Please <a href="admin_login.php">login as admin</a>.</p>
+        <?php endif; ?>
     </section>
 
     <?php if ($admin): ?>
@@ -233,7 +242,9 @@ require_once 'includes/header.php';
                                 <td><?= htmlspecialchars($e['description']) ?></td>
                                 <td><?= htmlspecialchars($e['date']) ?></td>
                                 <td>
-                                    <a href="delete_expense.php?id=<?= (int) $e['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this expense?');">Delete</a>
+                                    <?php if (!empty($_SESSION['is_admin'])): ?>
+                                        <a href="delete_expense.php?id=<?= (int) $e['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this expense?');">Delete</a>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
