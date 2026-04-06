@@ -4,9 +4,9 @@
  */
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'asiacamp_expenses');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_NAME', 'expense_user');
+define('DB_USER', 'root'); // expense_user && root
+define('DB_PASS', 'StrongPassword123'); // StrongPassword123 && ''
 define('DB_CHARSET', 'utf8mb4');
 
 // Simple shared admin password (change this!)
