@@ -27,6 +27,61 @@ foreach ($expenses as &$e) {
 }
 unset($e);
 
+// All Expenses table: merge regular expenses + advance (pool) rows credited to admin
+$ledger = [];
+foreach ($expenses as $e) {
+    $ledger[] = [
+        'type' => 'expense',
+        'sort_date' => $e['date'],
+        'sort_id' => (int) $e['id'],
+        'expense' => $e,
+    ];
+}
+if ($admin) {
+    $aid = (int) $admin['id'];
+    try {
+        $advStmt = $pdo->prepare("SELECT id, amount, date, description FROM advance_payments WHERE member_id = ? ORDER BY date DESC, id DESC");
+        $advStmt->execute([$aid]);
+        foreach ($advStmt->fetchAll(PDO::FETCH_ASSOC) as $ar) {
+            $perPerson = 0.0;
+            $ppStmt = $pdo->prepare("SELECT amount FROM advance_payments WHERE date = ? AND description <=> ? AND member_id != ? LIMIT 1");
+            $ppStmt->execute([$ar['date'], $ar['description'], $aid]);
+            $pp = $ppStmt->fetchColumn();
+            if ($pp !== false) {
+                $perPerson = (float) $pp;
+            } else {
+                $perPerson = (float) $ar['amount'];
+            }
+            $total = (float) $ar['amount'];
+            $people = ($perPerson > 0) ? (int) max(1, round($total / $perPerson)) : 1;
+            $ledger[] = [
+                'type' => 'advance',
+                'sort_date' => $ar['date'],
+                'sort_id' => (int) $ar['id'],
+                'advance' => [
+                    'id' => (int) $ar['id'],
+                    'paid_by_name' => $admin['name'],
+                    'category_name' => 'Advance',
+                    'total_amount' => $total,
+                    'per_person' => round($perPerson, 2),
+                    'share_count' => $people,
+                    'description' => $ar['description'] !== null && $ar['description'] !== '' ? $ar['description'] : 'Advance collection',
+                    'date' => $ar['date'],
+                ],
+            ];
+        }
+    } catch (PDOException $ignored) {
+        // advance_payments missing
+    }
+}
+usort($ledger, function ($a, $b) {
+    $c = strcmp($b['sort_date'], $a['sort_date']);
+    if ($c !== 0) {
+        return $c;
+    }
+    return $b['sort_id'] <=> $a['sort_id'];
+});
+
 $members = $pdo->query("SELECT id, name, is_admin FROM members ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -82,13 +137,37 @@ foreach ($expensesForSettlement as $ex) {
     $header = htmlspecialchars($ex['category_name']) . '(' . htmlspecialchars($ex['description']) . ')';
     $expenseColumns[] = ['id' => $eid, 'header' => $header];
 }
-$sharesData = $pdo->query("SELECT expense_id, member_id, share_amount FROM expense_shares")->fetchAll(PDO::FETCH_ASSOC);
+// Only shares for expenses that still exist; SUM merges duplicate rows per (expense, member)
+$sharesData = $pdo->query("
+    SELECT es.expense_id, es.member_id, SUM(es.share_amount) AS share_amount
+    FROM expense_shares es
+    INNER JOIN expenses e ON e.id = es.expense_id
+    GROUP BY es.expense_id, es.member_id
+")->fetchAll(PDO::FETCH_ASSOC);
 foreach ($sharesData as $s) {
     $eid = (int) $s['expense_id'];
     $mid = (int) $s['member_id'];
     if (isset($memberShares[$mid])) {
         $memberShares[$mid][$eid] = (float) $s['share_amount'];
     }
+}
+
+// Member summary: Expense = total share (same as settlement total row); Advance = credits; Credit = Advance − Expense
+$memberSummary = [];
+foreach ($members as $m) {
+    $mid = (int) $m['id'];
+    $expenseTotal = 0;
+    foreach ($expenseColumns as $col) {
+        $expenseTotal += $memberShares[$mid][$col['id']] ?? 0;
+    }
+    $adv = $totalAdvance[$mid] ?? 0;
+    $memberSummary[] = [
+        'name' => $m['name'],
+        'is_admin' => !empty($m['is_admin']),
+        'expense' => $expenseTotal,
+        'advance' => $adv,
+        'credit' => $adv - $expenseTotal,
+    ];
 }
 
 $formData = $_SESSION['expense_form'] ?? null;
@@ -194,19 +273,23 @@ require_once 'includes/header.php';
     </section>
 
     <?php if ($admin): ?>
-    <!-- Admin Credit / Debit Summary -->
+    <!-- Admin Credit / Debit: advance pool = money members gave admin; debit = what admin paid out for expenses -->
     <section class="card table-section">
         <h2>Admin (<?= htmlspecialchars($admin['name']) ?>) – Credit & Debit</h2>
         <?php
         $adminId = (int) $admin['id'];
-        $adminDebit = $totalPaid[$adminId] ?? 0;
-        $adminCredit = $totalAdvance[$adminId] ?? 0;
-        $adminShare = $totalShare[$adminId] ?? 0;
-        $adminBalance = ($adminDebit + $adminCredit) - $adminShare;
+        // Money admin paid out (all expenses where Paid By = admin)
+        $adminSpent = $totalPaid[$adminId] ?? 0;
+        // Advance collected into admin’s pool (from advance_payments)
+        $adminAdvanceReceived = $totalAdvance[$adminId] ?? 0;
+        // What’s left of the advance after admin spends it on group expenses
+        $adminAdvanceRemaining = $adminAdvanceReceived - $adminSpent;
         ?>
+        <p class="summary-intro">Members pay advance to you; you record expenses you pay. Balance = advance received − spent on expenses (cash left from the pool).</p>
         <div class="admin-summary">
-            <div class="admin-row"><span class="label">Credit (Advance received):</span> <span class="amount positive"><?= number_format($adminCredit, 2) ?></span></div>
-            <div class="admin-row"><span class="label">Balance:</span> <span class="amount balance <?= $adminBalance >= 0 ? 'positive' : 'negative' ?>"><?= $adminBalance >= 0 ? '+' : '' ?><?= number_format($adminBalance, 2) ?></span></div>
+            <div class="admin-row"><span class="label">Credit (Advance received):</span> <span class="amount positive"><?= number_format($adminAdvanceReceived, 2) ?></span></div>
+            <div class="admin-row"><span class="label">Debit (Spent on expenses):</span> <span class="amount"><?= number_format($adminSpent, 2) ?></span></div>
+            <div class="admin-row"><span class="label">Balance (Advance remaining):</span> <span class="amount balance <?= $adminAdvanceRemaining >= 0 ? 'positive' : 'negative' ?>"><?= $adminAdvanceRemaining >= 0 ? '+' : '' ?><?= number_format($adminAdvanceRemaining, 2) ?></span></div>
         </div>
     </section>
     <?php endif; ?>
@@ -214,8 +297,9 @@ require_once 'includes/header.php';
     <!-- All Expenses Table -->
     <section class="card table-section">
         <h2>All Expenses</h2>
-        <?php if (empty($expenses)): ?>
-            <p class="no-data">No expenses recorded yet. Add one above.</p>
+        <p class="summary-intro">Includes group expenses and advance collections (credited to admin).</p>
+        <?php if (empty($ledger)): ?>
+            <p class="no-data">No expenses or advance entries yet.</p>
         <?php else: ?>
             <div class="table-responsive">
                 <table class="data-table">
@@ -232,21 +316,40 @@ require_once 'includes/header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($expenses as $e): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($e['paid_by_name']) ?></td>
-                                <td><?= htmlspecialchars($e['category_name']) ?></td>
-                                <td class="amount"><?= number_format((float) $e['total_amount'], 2) ?></td>
-                                <td class="amount"><?= number_format($e['per_person'], 2) ?></td>
-                                <td><?= $e['share_count'] ?></td>
-                                <td><?= htmlspecialchars($e['description']) ?></td>
-                                <td><?= htmlspecialchars($e['date']) ?></td>
-                                <td>
-                                    <?php if (!empty($_SESSION['is_admin'])): ?>
-                                        <a href="delete_expense.php?id=<?= (int) $e['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this expense?');">Delete</a>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+                        <?php foreach ($ledger as $row): ?>
+                            <?php if ($row['type'] === 'expense'): ?>
+                                <?php $e = $row['expense']; ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($e['paid_by_name']) ?></td>
+                                    <td><?= htmlspecialchars($e['category_name']) ?></td>
+                                    <td class="amount"><?= number_format((float) $e['total_amount'], 2) ?></td>
+                                    <td class="amount"><?= number_format($e['per_person'], 2) ?></td>
+                                    <td><?= $e['share_count'] ?></td>
+                                    <td><?= htmlspecialchars($e['description']) ?></td>
+                                    <td><?= htmlspecialchars($e['date']) ?></td>
+                                    <td>
+                                        <?php if (!empty($_SESSION['is_admin'])): ?>
+                                            <a href="delete_expense.php?id=<?= (int) $e['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this expense?');">Delete</a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php else: ?>
+                                <?php $a = $row['advance']; ?>
+                                <tr class="ledger-advance">
+                                    <td><?= htmlspecialchars($a['paid_by_name']) ?> <span class="badge-advance">Credit</span></td>
+                                    <td><?= htmlspecialchars($a['category_name']) ?></td>
+                                    <td class="amount"><?= number_format((float) $a['total_amount'], 2) ?></td>
+                                    <td class="amount"><?= number_format($a['per_person'], 2) ?></td>
+                                    <td><?= $a['share_count'] ?></td>
+                                    <td><?= htmlspecialchars($a['description']) ?></td>
+                                    <td><?= htmlspecialchars($a['date']) ?></td>
+                                    <td>
+                                        <?php if (!empty($_SESSION['is_admin'])): ?>
+                                            <a href="delete_advance.php?id=<?= (int) $a['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this advance entry (full batch)?');">Delete</a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -292,7 +395,7 @@ require_once 'includes/header.php';
                         <tr>
                             <th>Expense</th>
                             <?php foreach ($members as $m): ?>
-                                <th class="amount"><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' <span class="badge-admin">Admin</span>' : '' ?></th>
+                                <th class="amount"><?= htmlspecialchars($m['name']) ?><?= !empty($m['is_admin']) ? ' <span class="badge-admin">A</span>' : '' ?></th>
                             <?php endforeach; ?>
                         </tr>
                     </thead>
@@ -311,11 +414,46 @@ require_once 'includes/header.php';
                             <?php foreach ($members as $m): ?>
                                 <?php
                                 $mid = (int) $m['id'];
-                                $rowTotal = array_sum($memberShares[$mid] ?? []);
+                                $rowTotal = 0;
+                                foreach ($expenseColumns as $col) {
+                                    $rowTotal += $memberShares[$mid][$col['id']] ?? 0;
+                                }
                                 ?>
                                 <td class="amount total-col"><?= number_format($rowTotal, 2) ?></td>
                             <?php endforeach; ?>
                         </tr>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
+
+    <!-- Member summary: expense share vs advance vs net credit -->
+    <section class="card table-section" id="member-summary">
+        <h2>Member Summary</h2>
+        <p class="summary-intro"><strong>Expense</strong> = this member’s total share of all group expenses. <strong>Advance</strong> = advance amounts recorded for this member. <strong>Credit</strong> = Advance − Expense (positive = net credit after their share).</p>
+        <?php if (empty($memberSummary)): ?>
+            <p class="no-data">No members yet.</p>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table class="data-table member-summary-table">
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th class="amount">Expense</th>
+                            <th class="amount">Credit</th>
+                            <th class="amount">Advance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($memberSummary as $ms): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($ms['name']) ?><?= $ms['is_admin'] ? ' <span class="badge-admin">Admin</span>' : '' ?></td>
+                                <td class="amount"><?= number_format($ms['expense'], 2) ?></td>
+                                <td class="amount credit-cell <?= $ms['credit'] > 0 ? 'positive' : ($ms['credit'] < 0 ? 'negative' : 'zero') ?>"><?= $ms['credit'] > 0 ? '+' : '' ?><?= number_format($ms['credit'], 2) ?></td>
+                                <td class="amount"><?= number_format($ms['advance'], 2) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>

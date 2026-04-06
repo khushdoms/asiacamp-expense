@@ -5,6 +5,8 @@
 
 require_once 'config.php';
 
+ensure_session_started();
+
 $message = '';
 $error = '';
 
@@ -23,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+$allCategories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = 'Add Category - Asia WordCamp 2026';
 require_once 'includes/header.php';
@@ -58,6 +62,44 @@ require_once 'includes/header.php';
             </div>
         </form>
     </section>
+
+    <?php if (!empty($_SESSION['is_admin'])): ?>
+    <section class="card table-section">
+        <h2>All Categories</h2>
+        <?php if (!empty($_SESSION['category_delete_success'])): ?>
+            <p class="message success">Category deleted.</p>
+            <?php unset($_SESSION['category_delete_success']); ?>
+        <?php endif; ?>
+        <?php if (!empty($_SESSION['category_delete_error'])): ?>
+            <p class="message error"><?= htmlspecialchars($_SESSION['category_delete_error']) ?></p>
+            <?php unset($_SESSION['category_delete_error']); ?>
+        <?php endif; ?>
+        <?php if (empty($allCategories)): ?>
+            <p class="no-data">No categories yet.</p>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($allCategories as $c): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($c['name']) ?></td>
+                                <td>
+                                    <a href="delete_category.php?id=<?= (int) $c['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this category? Only allowed if no expense uses it.');">Delete</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
 </div>
 
 <?php require_once 'includes/footer.php'; ?>

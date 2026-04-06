@@ -125,6 +125,33 @@ body {
     margin-left: 0.3rem;
 }
 
+.badge-advance {
+    font-size: 0.7rem;
+    background: var(--color-success);
+    color: #fff;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    margin-left: 0.25rem;
+}
+
+.data-table tr.ledger-advance td {
+    background: #f0f9f4;
+}
+
+.member-summary-table .credit-cell.positive {
+    color: var(--color-positive);
+    font-weight: 600;
+}
+
+.member-summary-table .credit-cell.negative {
+    color: var(--color-negative);
+    font-weight: 600;
+}
+
+.member-summary-table .credit-cell.zero {
+    color: var(--color-text-muted);
+}
+
 .settlement-grid th.amount,
 .settlement-grid td.amount {
     min-width: 70px;
